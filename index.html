@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Charter — write a commons that governs itself</title>
+<meta name="description" content="A guided builder for a commons charter, on Elinor Ostrom's eight principles for governing a shared resource — then sign it permanently to the open network. The oath layer from You Cannot Eat Code, made real.">
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="%2314171F"/><rect x="10" y="10" width="12" height="12" transform="rotate(45 16 16)" fill="%23C6A77A"/></svg>'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="frame" aria-hidden="true"></div>
+<main class="wrap">
+  <header>
+    <p class="kicker">The Charter</p>
+    <h1>Write a commons that governs itself.</h1>
+    <p class="tagline">Eight principles, worked out by hand, then signed where no one can quietly rewrite them.</p>
+  </header>
+
+  <form id="form" autocomplete="off"><!-- basics + 8 principle steps injected by charter.js --></form>
+
+  <div class="actions">
+    <button class="btn" id="preview" type="button">Draft the charter ↓</button>
+    <button class="btn btn-ghost" id="download" type="button">Download (.md)</button>
+  </div>
+
+  <div id="charter" class="charter" hidden></div>
+
+  <div id="sign-area" hidden>
+    <p class="signer" id="signer-status"></p>
+    <div class="actions">
+      <button class="btn" id="record" type="button">Sign &amp; record to the open network</button>
+      <button class="btn btn-ghost" id="use-ext" type="button" hidden>Use my Nostr extension</button>
+    </div>
+    <div class="result" id="result" aria-live="polite">
+      <h3 id="result-title">Recorded.</h3>
+      <div class="relays" id="relays"></div>
+      <a id="verify-link" href="#" target="_blank" rel="noopener"></a>
+      <div id="keyout" class="warn" hidden></div>
+    </div>
+  </div>
+
+  <p class="warn">
+    A recorded charter is <b>public and cannot be quietly rewritten</b> — that is the point. It is signed
+    by a key you hold (the signature is the adopting body's seal) and broadcast to several independent
+    relays, so no platform owns the official copy. Drafting here keeps nothing on a server; only
+    <em>you</em> decide when to record it. Built on Elinor Ostrom's eight design principles for enduring commons.
+  </p>
+
+  <footer>
+    <a href="https://github.com/michaelditter/the-charter">Open source on GitHub</a> ·
+    built for <a href="https://youcannoteat.codes">You Cannot Eat Code</a> ·
+    records via <a href="https://github.com/michaelditter/the-record">The Record</a> · the oath layer, made real
+  </footer>
+</main>
+
+<script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+<script src="charter.js"></script>
+</body>
+</html>
