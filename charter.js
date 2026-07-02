@@ -4,7 +4,12 @@
   const NT = window.NostrTools;
   const RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net', 'wss://relay.nostr.band'];
   const LS = 'the_charter_nsec';
+  const LS_SIGNER = 'the_charter_signer'; // 'ext' | 'local' — remembers the user's choice
+  const LS_DRAFT = 'the_charter_draft';   // autosaved form values
   const $ = (s) => document.querySelector(s);
+  // Escape HTML so remote-controlled text (e.g. relay error strings) can never inject markup.
+  // Escapes quotes too, since esc() is also used in attribute contexts.
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // Basics + Elinor Ostrom's eight design principles for governing a commons.
   const BASICS = [
@@ -56,6 +61,25 @@
   // default date = today (ISO date)
   try { $('#b-date').value = new Date().toISOString().slice(0, 10); } catch (e) {}
 
+  // ---- draft autosave: keep form values across an accidental refresh ----
+  const fieldEls = () => Array.prototype.slice.call(form.querySelectorAll('input, textarea'));
+  function restoreDraft() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS_DRAFT) || 'null');
+      if (!saved) return;
+      fieldEls().forEach((el) => { if (Object.prototype.hasOwnProperty.call(saved, el.id) && saved[el.id]) el.value = saved[el.id]; });
+    } catch (e) {}
+  }
+  function saveDraft() {
+    try {
+      const out = {};
+      fieldEls().forEach((el) => { if (el.id) out[el.id] = el.value; });
+      localStorage.setItem(LS_DRAFT, JSON.stringify(out));
+    } catch (e) {}
+  }
+  restoreDraft();
+  form.addEventListener('input', saveDraft);
+
   // ---- build the charter ----
   function val(id) { const el = $(id); return (el && el.value.trim()) || ''; }
   function buildMarkdown() {
@@ -70,7 +94,7 @@
       md += `\n## ${i + 1}. ${p.title}\n\n${val('#p-' + p.key) || '_(to be agreed)_'}\n`;
     });
     md += `\n---\n\n**Adopted by:** ${stewards || '_(the membership)_'}${date ? ' — ' + date : ''}.\n`;
-    md += `\n_Drafted with The Charter and recorded permanently via The Record — youcannoteat.codes._\n`;
+    md += `\n_Drafted with The Charter and signed to the open network, alongside The Record. Durable, not eternal: this record lives as long as one relay keeps a copy, and no single platform can recall it. youcannoteat.codes_\n`;
     return { md, name, date };
   }
   function renderCharter() {
@@ -78,7 +102,6 @@
     const el = $('#charter');
     // simple, safe markdown → HTML. Only **bold** inline; whole-line _..._ is italic,
     // so the ____ fill-in blanks in the charter render literally (not as italics).
-    const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
     const bold = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
     let html = '';
     md.split('\n').forEach((line) => {
@@ -110,15 +133,33 @@
 
   // ---- sign to Nostr (kind 30023 long-form) ----
   const hasExt = () => !!window.nostr && typeof window.nostr.signEvent === 'function';
-  let useExt = false;
-  function refreshSigner() {
-    const s = $('#signer-status'), ext = $('#use-ext');
-    if (hasExt() && useExt) s.innerHTML = 'Signing with your <b>Nostr extension</b> — your key never touches this page.';
-    else if (localStorage.getItem(LS)) s.innerHTML = 'Signing with your <b>saved key</b> on this device.';
-    else s.innerHTML = 'A <b>signing key</b> is created when you record (shown once — save it).';
-    ext.hidden = !(hasExt() && !useExt);
+  // Restore a remembered signer choice; only 'ext' is meaningful if an extension is present.
+  let useExt = localStorage.getItem(LS_SIGNER) === 'ext';
+  function setSigner(choice) {
+    useExt = choice === 'ext';
+    localStorage.setItem(LS_SIGNER, choice);
+    refreshSigner();
   }
-  $('#use-ext').addEventListener('click', () => { useExt = true; refreshSigner(); });
+  function refreshSigner() {
+    const s = $('#signer-status'), choose = $('#signer-choice');
+    // If an extension is present but the user hasn't chosen yet, force an explicit choice
+    // rather than silently generating a local key.
+    const chosen = localStorage.getItem(LS_SIGNER) === 'ext' || localStorage.getItem(LS_SIGNER) === 'local';
+    const needChoice = hasExt() && !chosen;
+    if (choose) choose.hidden = !needChoice;
+    if (hasExt() && useExt) {
+      s.innerHTML = 'Signing with your <b>Nostr extension</b> — your secret key never touches this page.';
+    } else if (needChoice) {
+      s.innerHTML = 'A Nostr extension was detected. Choose how to sign below before recording.';
+    } else if (localStorage.getItem(LS)) {
+      s.innerHTML = 'Signing with a <b>dedicated charter key stored in this browser</b>. It stays on this device until you remove it.';
+    } else {
+      s.innerHTML = 'A <b>dedicated charter key</b> will be created and stored in this browser when you record. Anyone with that key can replace the recorded charter, so guard it.';
+    }
+  }
+  const btnExt = $('#use-ext'), btnLocal = $('#use-local');
+  if (btnExt) btnExt.addEventListener('click', () => setSigner('ext'));
+  if (btnLocal) btnLocal.addEventListener('click', () => setSigner('local'));
 
   function localSk() {
     let n = localStorage.getItem(LS);
@@ -132,6 +173,14 @@
 
   $('#record').addEventListener('click', async () => {
     if (!NT) { alert('Nostr library not loaded — check your connection.'); return; }
+    // If a Nostr extension is present, require an explicit signer choice first.
+    if (hasExt() && localStorage.getItem(LS_SIGNER) !== 'ext' && localStorage.getItem(LS_SIGNER) !== 'local') {
+      refreshSigner();
+      alert('A Nostr extension was detected. Choose how to sign — with your extension, or with a dedicated charter key stored in this browser — before recording.');
+      return;
+    }
+    // This is a real, public broadcast to live relays. Confirm before polluting the network.
+    if (!confirm('This charter will be signed and broadcast publicly to live Nostr relays, tagged #therecord and #youcannoteat. It is real and cannot be un-published (a relay may keep a copy indefinitely). Record it now?')) return;
     const { md, name, date } = buildMarkdown();
     const slug = (name || 'charter').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Math.random().toString(36).slice(2, 6);
     const tmpl = {
@@ -154,22 +203,61 @@
       btn.textContent = 'Recording…';
       const pool = new NT.SimplePool();
       const per = await Promise.all(pool.publish(RELAYS, event).map((p, i) => withTimeout(p, 8000, RELAYS[i])));
-      try { pool.close(RELAYS); } catch (e) {}
+      // Close after a short grace period so a slow relay that is still accepting the
+      // publish when the 8s timeout fires can finish, rather than being cut off.
+      setTimeout(() => { try { pool.close(RELAYS); } catch (e) {} }, 4000);
+      // nevent pins the exact signed version by its immutable event id (kind 30023 is
+      // replaceable, so the naddr address can be overwritten by a later signature).
+      const nevent = NT.nip19.neventEncode({ id: event.id, relays: RELAYS.slice(0, 2), author: pk });
       const naddr = NT.nip19.naddrEncode({ identifier: slug, pubkey: pk, kind: 30023, relays: RELAYS.slice(0, 2) });
-      showResult(per, 'https://njump.me/' + naddr, newKey);
+      showResult(per, { nevent: nevent, naddr: naddr, id: event.id }, newKey);
     } catch (e) { alert('Could not record: ' + ((e && e.message) || e)); }
     finally { btn.disabled = false; btn.textContent = 'Sign & record to the open network'; refreshSigner(); }
   });
 
-  function showResult(per, link, newKey) {
+  function showResult(per, links, newKey) {
     const accepted = per.filter((r) => r.ok).length;
     $('#result-title').textContent = accepted > 0 ? `Recorded — live on ${accepted}/${per.length} relays.` : 'No relay accepted it.';
-    $('#relays').innerHTML = per.map((r) => `<div><span class="${r.ok ? 'ok' : 'bad'}">${r.ok ? '✓' : '✗'}</span> ${r.relay}${r.ok ? '' : ' — ' + (r.error || 'failed')}</div>`).join('');
-    const a = $('#verify-link'); a.href = link; a.textContent = link;
+    $('#relays').innerHTML = per.map((r) => `<div><span class="${r.ok ? 'ok' : 'bad'}">${r.ok ? '✓' : '✗'}</span> ${esc(r.relay)}${r.ok ? '' : ' — ' + esc(r.error || 'failed')}</div>`).join('');
+    // Primary link references the exact signed version (nevent → immutable event id).
+    const thisUrl = 'https://njump.me/' + links.nevent;
+    const latestUrl = 'https://njump.me/' + links.naddr;
+    const a = $('#verify-link'); a.href = thisUrl; a.textContent = thisUrl;
+    // Raw identifiers so verification survives njump.me going away.
+    const raw = $('#verify-raw');
+    if (raw) {
+      raw.hidden = false;
+      raw.innerHTML =
+        `<div><b>This version</b> (the exact signed document): <code style="user-select:all">${esc(links.nevent)}</code></div>` +
+        `<div><b>Latest version</b> (the address; a later signature by the same key replaces it): <a href="${esc(latestUrl)}" target="_blank" rel="noopener">${esc(latestUrl)}</a></div>` +
+        `<div>Event id: <code style="user-select:all">${esc(links.id)}</code></div>`;
+    }
     const k = $('#keyout');
     if (newKey) {
       k.hidden = false;
-      k.innerHTML = `<b>The charter's signing key — save it.</b> The adopting body signs future amendments with this.<br>Public seal: <code style="color:var(--brass-bright);user-select:all">${newKey.npub}</code><br>Secret key: <code style="color:var(--brass-bright);user-select:all">${newKey.nsec}</code>`;
+      k.innerHTML =
+        `<b>The charter's signing key — save it now.</b> This key is the adopting body's seal; it signs future amendments, and <b>anyone who holds it can replace (rewrite) the recorded charter in place.</b> It is stored in this browser until you remove it below.` +
+        `<br>Public seal: <code style="color:var(--brass-bright);user-select:all">${esc(newKey.npub)}</code>` +
+        `<br>Secret key: <code style="color:var(--brass-bright);user-select:all">${esc(newKey.nsec)}</code>` +
+        `<div class="actions" style="margin-top:.6rem">` +
+        `<button class="btn btn-ghost" id="dl-key" type="button">Download key file</button>` +
+        `<button class="btn btn-ghost" id="rm-key" type="button">Remove key from this browser</button>` +
+        `</div>`;
+      const dl = $('#dl-key');
+      if (dl) dl.addEventListener('click', () => {
+        const body = `The Charter — signing key\n\nKeep this secret key safe and private. Anyone who holds it can amend or replace your recorded charter.\n\nPublic seal (npub): ${newKey.npub}\nSecret key (nsec): ${newKey.nsec}\n`;
+        const blob = new Blob([body], { type: 'text/plain' });
+        const u = URL.createObjectURL(blob);
+        const el = document.createElement('a'); el.href = u; el.download = 'the-charter-key.txt'; el.click();
+        setTimeout(() => URL.revokeObjectURL(u), 2000);
+      });
+      const rm = $('#rm-key');
+      if (rm) rm.addEventListener('click', () => {
+        if (!confirm('Remove the signing key from this browser? Save it first — without it you can never amend this charter. This cannot be undone here.')) return;
+        localStorage.removeItem(LS);
+        rm.disabled = true; rm.textContent = 'Removed';
+        refreshSigner();
+      });
     } else k.hidden = true;
     $('#result').classList.add('on');
     $('#result').scrollIntoView({ behavior: 'smooth', block: 'center' });

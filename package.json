@@ -1,8 +1,8 @@
 {
   "name": "the-charter",
   "version": "1.0.0",
-  "description": "A guided commons charter on Ostrom's eight principles, signed permanently to Nostr. The oath layer from You Cannot Eat Code, made real.",
-  "scripts": { "serve": "python3 -m http.server 4557" },
+  "description": "A guided commons charter on Ostrom's eight principles, signed to Nostr: tamper-evident, durable (not eternal), and recallable by no single platform. The oath layer from You Cannot Eat Code, made real.",
+  "scripts": { "serve": "python3 -m http.server 3000" },
   "keywords": ["ostrom", "commons", "charter", "governance", "nostr", "youcannoteat"],
   "author": "Michael Ditter",
   "license": "MIT",
