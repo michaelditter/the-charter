@@ -181,14 +181,19 @@
     }
     // This is a real, public broadcast to live relays. Confirm before polluting the network.
     if (!confirm('This charter will be signed and broadcast publicly to live Nostr relays, tagged #therecord and #youcannoteat. It is real and cannot be un-published (a relay may keep a copy indefinitely). Record it now?')) return;
+    if (!window.RecordCore) { alert('Shared record core not loaded yet — reload and try again.'); return; }
     const { md, name, date } = buildMarkdown();
     const slug = (name || 'charter').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Math.random().toString(36).slice(2, 6);
-    const tmpl = {
-      kind: 30023, created_at: Math.floor(Date.now() / 1000),
-      tags: [['d', slug], ['title', 'Charter of ' + name], ['published_at', String(Math.floor(Date.now() / 1000))],
-        ['t', 'therecord'], ['t', 'youcannoteat'], ['t', 'commons-charter']],
-      content: md
-    };
+    // Built through record-core (the shared CRP core): kind 30023 with the CRP tag
+    // grammar (client, t=youcannoteat, t=civic-record, t=commons-charter, d), plus
+    // the legacy 'therecord' hashtag and published_at for continuity.
+    const tmpl = window.RecordCore.buildCharter({
+      content: md,
+      title: 'Charter of ' + name,
+      d: slug,
+      client: 'the-charter',
+      extraTags: [['t', 'therecord'], ['published_at', String(Math.floor(Date.now() / 1000))]]
+    });
     const btn = $('#record'); btn.disabled = true; btn.textContent = 'Signing…';
     let newKey = null;
     try {

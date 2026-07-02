@@ -65,6 +65,9 @@
 
 <!-- nostr-tools@2.23.5 vendored locally (vendor/nostr.bundle.js) so signing never depends on a live CDN. -->
 <script src="vendor/nostr.bundle.js"></script>
+<!-- record-core (the shared Civic Record Protocol core) vendored from
+     github.com/michaelditter/record-core; exposed on window for charter.js. -->
+<script type="module">import * as RecordCore from './vendor/record-core.mjs'; window.RecordCore = RecordCore;</script>
 <script src="charter.js"></script>
 </body>
 </html>
